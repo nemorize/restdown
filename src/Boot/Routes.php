@@ -1,7 +1,8 @@
 <?php
 
 use App\Application;
-use App\Controllers\Auth\AuthController;
+use App\Controllers\PostController;
+use App\Controllers\WebhookController;
 use App\Core\Http\Route;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
@@ -20,8 +21,14 @@ Route::any('/', function (ServerRequest $request, Response $response): Response 
 });
 
 /**
- * Authentication routes.
+ * Post routes.
  */
-Route::group('/auth', function (RouteCollectorProxy $group) {
-    $group->any('/authenticate', [ AuthController::class, 'getAuthenticate' ]);
+Route::group('/posts', function (RouteCollectorProxy $group) {
+    $group->get('', [ PostController::class, 'getPosts' ]);
+    $group->get('/{slug}', [ PostController::class, 'getPost' ]);
 });
+
+/**
+ * Webhook route.
+ */
+Route::get('/webhook', [ WebhookController::class, 'webhook' ]);
