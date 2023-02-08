@@ -109,9 +109,9 @@ class IndexingService
     /**
      * Get the root directory of the markdown files.
      *
-     * @return string
+     * @return string|false
      */
-    public function getRootDir (): string
+    public function getRootDir (): string|false
     {
         $rootDir = Application::get('env:MARKDOWN_ROOT') ?? './markdowns';
         if (!str_starts_with($rootDir, '/')) {

@@ -35,7 +35,7 @@ class WebhookController
         }
 
         $rawBody = $request->getBody()->getContents();
-        if (!hash_equals($hash, hash_hmac('sha256', $rawBody, Application::get('env:WEBHOOK_SECRET')))) {
+        if (!hash_equals($hash, hash_hmac('sha256', $rawBody, Application::get('env:GITHUB_SECRET')))) {
             return $response->withStatus(400);
         }
 
@@ -49,9 +49,34 @@ class WebhookController
         }
 
         set_time_limit(0);
+
         $root = $this->indexingService->getRootDir();
+        if (!$root) {
+            $root = Application::get('env:MARKDOWN_ROOT') ?? './markdowns';
+            if (!str_starts_with($root, '/')) {
+                $root = __DIR__ . '/../../' . $root;
+            }
+            mkdir($root, 0777, true);
+            $root = realpath($root);
+            if (!$root) {
+                return $response->withStatus(500)->withJson([
+                    'error' => 'Failed to create the root directory.'
+                ]);
+            }
+        }
+
+        if (!is_dir($root . '/.git')) {
+            if ($this->gitService->clone($root) === null) {
+                return $response->withStatus(500)->withJson([
+                    'error' => 'Failed to clone the repository.'
+                ]);
+            }
+        }
+
         if ($this->gitService->pull($root) === null) {
-            return $response->withStatus(500);
+            return $response->withStatus(500)->withJson([
+                'error' => 'Failed to pull the repository.'
+            ]);
         }
 
         $this->indexingService->saveIndexing();

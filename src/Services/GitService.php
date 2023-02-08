@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Application;
+
 class GitService
 {
     /**
@@ -75,5 +77,21 @@ class GitService
     public function pull (string $path): ?string
     {
         return shell_exec('cd ' . $path . ' && git pull');
+    }
+
+    /**
+     * Clone the remote repository.
+     *
+     * @param string $path
+     * @return ?string
+     */
+    public function clone (string $path): ?string
+    {
+        $githubUrl = Application::get('env:GITHUB_URL');
+        if (empty($githubUrl)) {
+            return null;
+        }
+
+        return shell_exec('cd ' . $path . ' && git clone ' . $githubUrl . ' . 2>&1');
     }
 }
