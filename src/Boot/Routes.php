@@ -31,4 +31,4 @@ Route::group('/posts', function (RouteCollectorProxy $group) {
 /**
  * Webhook route.
  */
-Route::get('/webhook', [ WebhookController::class, 'webhook' ]);
+Route::post('/webhook', [ WebhookController::class, 'webhook' ]);

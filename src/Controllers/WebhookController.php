@@ -35,7 +35,7 @@ class WebhookController
         }
 
         $rawBody = $request->getBody()->getContents();
-        if (!hash_equals($hash, hash_hmac('sha256', $rawBody, Application::get('env:GITHUB_WEBHOOK_SECRET')))) {
+        if (!hash_equals($hash, hash_hmac('sha256', $rawBody, Application::get('env:WEBHOOK_SECRET')))) {
             return $response->withStatus(400);
         }
 
@@ -50,9 +50,11 @@ class WebhookController
 
         set_time_limit(0);
         $root = $this->indexingService->getRootDir();
-        $this->gitService->pull($root);
-        $this->indexingService->saveIndexing();
+        if ($this->gitService->pull($root) === null) {
+            return $response->withStatus(500);
+        }
 
+        $this->indexingService->saveIndexing();
         return $response->withStatus(200);
     }
 }

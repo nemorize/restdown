@@ -69,10 +69,10 @@ class GitService
      * Pull the latest changes from the remote repository.
      *
      * @param string $path
-     * @return void
+     * @return ?string
      */
-    public function pull (string $path): void
+    public function pull (string $path): ?string
     {
-        shell_exec('cd ' . $path . ' && git pull');
+        return shell_exec('cd ' . $path . ' && git pull');
     }
 }
