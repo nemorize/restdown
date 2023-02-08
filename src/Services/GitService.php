@@ -55,7 +55,8 @@ class GitService
             return self::$timestamps[$path];
         }
 
-        $cmd = 'git log --pretty="format:%ct" ' . $path;
+        $dirPath = dirname($path);
+        $cmd = 'cd "' . $dirPath . '" && git log --pretty="format:%ct" "' . substr($path, strlen($dirPath) + 1) . '"';
         $dates = shell_exec($cmd);
         if (!is_string($dates)) {
             return [];
