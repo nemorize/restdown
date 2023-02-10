@@ -31,7 +31,7 @@ class TrailingSlashesMiddleware implements MiddlewareInterface
 
         if ($uri->getPath() !== $path) {
             return (new Response())
-                ->withHeader('Location', $uri->withPath($path))
+                ->withHeader('Location', (string) $uri->withPath($path))
                 ->withStatus(301);
         }
 
