@@ -1,5 +1,6 @@
 <?php
 
+use App\Middlewares\Core\CorsMiddleware;
 use App\Middlewares\Core\TrailingSlashesMiddleware;
 
 return [
@@ -9,5 +10,6 @@ return [
      */
     'app:middlewares' => [
         TrailingSlashesMiddleware::class,
+        CorsMiddleware::class
     ],
 ];
