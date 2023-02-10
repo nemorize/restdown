@@ -23,10 +23,33 @@ class PostController
     {
         $offset = $request->getQueryParam('offset', 0);
         $limit = $request->getQueryParam('limit', 10);
-        $query = $request->getQueryParam('query', null);
+        $query = $request->getQueryParam('query');
+
+        if (filter_var($offset, FILTER_VALIDATE_INT) === false || (int) $offset < 0) {
+            return $response->withStatus(400)->withJson([
+                'success' => false,
+                'message' => 'validation_failed',
+                'detail' => [
+                    'offset' => 'min [0]'
+                ]
+            ]);
+        }
+
+        if (filter_var($limit, FILTER_VALIDATE_INT) === false || (int) $limit < 1 || (int) $limit > 100) {
+            return $response->withStatus(400)->withJson([
+                'success' => false,
+                'message' => 'validation_failed',
+                'detail' => [
+                    'limit' => 'between [1, 100]'
+                ]
+            ]);
+        }
 
         $posts = $this->postService->getPosts($offset, $limit, $query);
-        return $response->withJson($posts);
+        return $response->withJson([
+            'success' => true,
+            'posts' => $posts
+        ]);
     }
 
     /**
@@ -41,14 +64,23 @@ class PostController
     {
         $slug = $params['slug'] ?? null;
         if ($slug === null) {
-            return $response->withStatus(400);
+            return $response->withStatus(400)->withJson([
+                'success' => false,
+                'message' => 'slug_missing'
+            ]);
         }
 
         $post = $this->postService->getPost($slug);
         if ($post === null) {
-            return $response->withStatus(404);
+            return $response->withStatus(404)->withJson([
+                'success' => false,
+                'message' => 'post_not_found'
+            ]);
         }
 
-        return $response->withJson($post);
+        return $response->withJson([
+            'success' => true,
+            'post' => $post
+        ]);
     }
 }
