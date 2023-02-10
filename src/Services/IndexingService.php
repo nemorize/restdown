@@ -42,10 +42,14 @@ class IndexingService
         $sqlite->exec('DROP TABLE IF EXISTS posts');
         $sqlite->exec('DROP TABLE IF EXISTS posts_categories');
         $sqlite->exec('DROP TABLE IF EXISTS posts_tags');
+        $sqlite->exec('DROP TABLE IF EXISTS categories');
+        $sqlite->exec('DROP TABLE IF EXISTS tags');
         $sqlite->exec('CREATE TABLE IF NOT EXISTS posts (
             slug TEXT PRIMARY KEY,
             path TEXT NOT NULL,
             title TEXT NOT NULL,
+            categories TEXT NOT NULL,
+            tags TEXT NOT NULL,
             createdAt INTEGER NOT NULL,
             updatedAt INTEGER NOT NULL,
             extras TEXT NOT NULL,
@@ -63,20 +67,52 @@ class IndexingService
             tag TEXT NOT NULL,
             UNIQUE (post, tag)
         )');
+        $sqlite->exec('CREATE TABLE IF NOT EXISTS categories (
+            name TEXT PRIMARY KEY,
+            count INTEGER NOT NULL,
+            UNIQUE (name)
+        )');
+        $sqlite->exec('CREATE TABLE IF NOT EXISTS tags (
+            name TEXT PRIMARY KEY,
+            count INTEGER NOT NULL,
+            UNIQUE (name)
+        )');
 
-        $postStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts (slug, path, title, createdAt, updatedAt, extras) VALUES (?, ?, ?, ?, ?, ?)');
-        $categoryStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_categories (post, category) VALUES (?, ?)');
-        $tagStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_tags (post, tag) VALUES (?, ?)');
+        $postStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts (slug, path, title, categories, tags, createdAt, updatedAt, extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $postCategoryStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_categories (post, category) VALUES (?, ?)');
+        $postTagStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_tags (post, tag) VALUES (?, ?)');
 
         $index = $this->getIndexing();
+        $categories = $tags = [];
+
         foreach ($index as $post) {
-            $postStmt->execute([ $post->slug, $post->path, $post->title, $post->createdAt, $post->updatedAt, json_encode($post->extras) ]);
+            $postStmt->execute([ $post->slug, $post->path, $post->title, json_encode($post->categories), json_encode($tags), $post->createdAt, $post->updatedAt, json_encode($post->extras) ]);
             foreach ($post->categories as $category) {
-                $categoryStmt->execute([ $post->slug, $category ]);
+                $postCategoryStmt->execute([ $post->slug, $category ]);
+
+                if (!isset($categories[$category])) {
+                    $categories[$category] = 0;
+                }
+                $categories[$category]++;
             }
             foreach ($post->tags as $tag) {
-                $tagStmt->execute([ $post->slug, $tag ]);
+                $postTagStmt->execute([ $post->slug, $tag ]);
+
+                if (!isset($tags[$tag])) {
+                    $tags[$tag] = 0;
+                }
+                $tags[$tag]++;
             }
+        }
+
+        $categoryStmt = $sqlite->prepare('INSERT OR REPLACE INTO categories (name, count) VALUES (?, ?)');
+        foreach ($categories as $category => $count) {
+            $categoryStmt->execute([ $category, $count ]);
+        }
+
+        $tagStmt = $sqlite->prepare('INSERT OR REPLACE INTO tags (name, count) VALUES (?, ?)');
+        foreach ($tags as $tag => $count) {
+            $tagStmt->execute([ $tag, $count ]);
         }
     }
 
@@ -110,7 +146,16 @@ class IndexingService
                     continue;
                 }
 
-                if ($key === 'slug' || $key === 'title' || $key === 'tags' || $key === 'createdAt' || $key === 'updatedAt') {
+                if ($key === 'tag' || $key === 'tags') {
+                    if (!is_array($value)) {
+                        $value = [ $value ];
+                    }
+
+                    $data->tags = $value;
+                    continue;
+                }
+
+                if ($key === 'slug' || $key === 'title' || $key === 'createdAt' || $key === 'updatedAt') {
                     $data->{$key} = $value;
                 } else {
                     $extras[$key] = $value;
@@ -122,6 +167,9 @@ class IndexingService
             }
             if (!isset($data->updatedAt)) {
                 $data->updatedAt = $this->gitService->getUpdatedAt($file);
+            }
+            if (!isset($data->tags)) {
+                $data->tags = [];
             }
 
             $data->extras = $extras;
@@ -283,7 +331,7 @@ class IndexingService
     {
         if ($where) {
             $query = '
-                SELECT posts_categories.category AS category
+                SELECT posts_categories.category, posts.* FROM posts_categories
                 INNER JOIN posts ON posts_categories.post = posts.slug
                 WHERE posts_categories.category = ? AND posts.title LIKE ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
             ';
@@ -291,7 +339,7 @@ class IndexingService
         }
         else {
             $query = '
-                SELECT posts_categories.category AS category
+                SELECT posts_categories.category, posts.* FROM posts_categories
                 INNER JOIN posts ON posts_categories.post = posts.slug
                 WHERE posts_categories.category = ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
             ';
@@ -320,7 +368,7 @@ class IndexingService
     {
         if ($where) {
             $query = '
-                SELECT posts_tags.tag AS tag
+                SELECT posts_tags.tag, posts.* FROM posts_tags
                 INNER JOIN posts ON posts_tags.post = posts.slug
                 WHERE posts_tags.tag = ? AND posts.title LIKE ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
             ';
@@ -328,7 +376,7 @@ class IndexingService
         }
         else {
             $query = '
-                SELECT posts_tags.tag AS tag
+                SELECT posts_tags.tag, posts.* FROM posts_tags
                 INNER JOIN posts ON posts_tags.post = posts.slug
                 WHERE posts_tags.tag = ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
             ';
@@ -342,5 +390,71 @@ class IndexingService
         }
 
         return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    /**
+     * Get all categories.
+     *
+     * @return array
+     */
+    public function getCategories (): array
+    {
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare('SELECT * FROM categories');
+        if (!$stmt->execute()) {
+            return [];
+        }
+
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    /**
+     * Get a category.
+     *
+     * @param string $name
+     * @return object|null
+     */
+    public function getCategory (string $name): ?object
+    {
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare('SELECT * FROM categories WHERE name = ?');
+        if (!$stmt->execute([ $name ]) || !($category = $stmt->fetchObject())) {
+            return null;
+        }
+
+        return $category;
+    }
+
+    /**
+     * Get all tags.
+     *
+     * @return array
+     */
+    public function getTags (): array
+    {
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare('SELECT * FROM tags');
+        if (!$stmt->execute()) {
+            return [];
+        }
+
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    /**
+     * Get a tag.
+     *
+     * @param string $name
+     * @return object|null
+     */
+    public function getTag (string $name): ?object
+    {
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare('SELECT * FROM tags WHERE name = ?');
+        if (!$stmt->execute([ $name ]) || !($tag = $stmt->fetchObject())) {
+            return null;
+        }
+
+        return $tag;
     }
 }

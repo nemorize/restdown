@@ -1,7 +1,9 @@
 <?php
 
 use App\Application;
+use App\Controllers\CategoryController;
 use App\Controllers\PostController;
+use App\Controllers\TagController;
 use App\Controllers\WebhookController;
 use App\Core\Http\Route;
 use Slim\Http\Response;
@@ -26,6 +28,28 @@ Route::any('/', function (ServerRequest $request, Response $response): Response 
 Route::group('/posts', function (RouteCollectorProxy $group) {
     $group->get('', [ PostController::class, 'getPosts' ]);
     $group->get('/{slug}', [ PostController::class, 'getPost' ]);
+});
+
+/**
+ * Category routes.
+ */
+Route::group('/categories', function (RouteCollectorProxy $group) {
+    $group->get('', [ CategoryController::class, 'getCategories' ]);
+    $group->group('/{category}', function (RouteCollectorProxy $group) {
+        $group->get('', [ CategoryController::class, 'getCategory' ]);
+        $group->get('/posts', [ CategoryController::class, 'getCategoryPosts' ]);
+    });
+});
+
+/**
+ * Tag routes.
+ */
+Route::group('/tags', function (RouteCollectorProxy $group) {
+    $group->get('', [ TagController::class, 'getTags' ]);
+    $group->group('/{tag}', function (RouteCollectorProxy $group) {
+        $group->get('', [ TagController::class, 'getTag' ]);
+        $group->get('/posts', [ TagController::class, 'getTagPosts' ]);
+    });
 });
 
 /**

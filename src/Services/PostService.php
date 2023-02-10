@@ -22,6 +22,9 @@ class PostService
         $posts = $this->indexingService->getPosts($offset, $limit, $where);
         return array_map(function ($post) {
             $post->content = $this->parseMarkdown($post->path);
+            $post->categories = json_decode($post->categories);
+            $post->tags = json_decode($post->tags);
+
             unset($post->path);
             return $post;
         }, $posts);
@@ -41,6 +44,9 @@ class PostService
         }
 
         $post->content = $this->parseMarkdown($post->path);
+        $post->categories = json_decode($post->categories);
+        $post->tags = json_decode($post->tags);
+
         unset($post->path);
         return $post;
     }
