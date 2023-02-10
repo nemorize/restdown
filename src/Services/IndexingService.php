@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Application;
+use PDO;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
@@ -10,11 +11,25 @@ use Symfony\Component\Yaml\Yaml;
 
 class IndexingService
 {
-    private static ?array $indexing = null;
-
     public function __construct (
         private readonly GitService $gitService
     ) {}
+
+    /**
+     * Get SQLite3 database.
+     *
+     * @return PDO
+     */
+    public function getSqlite (): PDO
+    {
+        $sqlitePath = __DIR__ . '/../../storage/indexing.sqlite';
+        if (!file_exists($sqlitePath)) {
+            mkdir(dirname($sqlitePath), 0777, true);
+            touch($sqlitePath);
+        }
+
+        return new PDO('sqlite:' . $sqlitePath);
+    }
 
     /**
      * Save the index of all markdown files.
@@ -23,15 +38,46 @@ class IndexingService
      */
     public function saveIndexing (): void
     {
+        $sqlite = $this->getSqlite();
+        $sqlite->exec('DROP TABLE IF EXISTS posts');
+        $sqlite->exec('DROP TABLE IF EXISTS posts_categories');
+        $sqlite->exec('DROP TABLE IF EXISTS posts_tags');
+        $sqlite->exec('CREATE TABLE IF NOT EXISTS posts (
+            slug TEXT PRIMARY KEY,
+            path TEXT NOT NULL,
+            title TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL,
+            extras TEXT NOT NULL,
+            UNIQUE (path)
+        )');
+        $sqlite->exec('CREATE TABLE IF NOT EXISTS posts_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post TEXT NOT NULL,
+            category TEXT NOT NULL,
+            UNIQUE (post, category)
+        )');
+        $sqlite->exec('CREATE TABLE IF NOT EXISTS posts_tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            UNIQUE (post, tag)
+        )');
+
+        $postStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts (slug, path, title, createdAt, updatedAt, extras) VALUES (?, ?, ?, ?, ?, ?)');
+        $categoryStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_categories (post, category) VALUES (?, ?)');
+        $tagStmt = $sqlite->prepare('INSERT OR REPLACE INTO posts_tags (post, tag) VALUES (?, ?)');
+
         $index = $this->getIndexing();
-        $raw = var_export($index, true);
-
-        $dirPath = __DIR__ . '/../../storage';
-        if (!is_dir($dirPath)) {
-            mkdir($dirPath, 0777, true);
+        foreach ($index as $post) {
+            $postStmt->execute([ $post->slug, $post->path, $post->title, $post->createdAt, $post->updatedAt, json_encode($post->extras) ]);
+            foreach ($post->categories as $category) {
+                $categoryStmt->execute([ $post->slug, $category ]);
+            }
+            foreach ($post->tags as $tag) {
+                $tagStmt->execute([ $post->slug, $tag ]);
+            }
         }
-
-        file_put_contents($dirPath . '/indexing.php', '<?php return ' . $raw . ';');
     }
 
     /**
@@ -42,9 +88,6 @@ class IndexingService
     public function getIndexing (): array
     {
         $posts = [];
-        $categories = [];
-        $tags = [];
-
         foreach ($this->getAllFiles() as $file) {
             $data = $this->parseFilename($file);
             $firstMatters = $this->parseFirstMatters($file);
@@ -83,27 +126,9 @@ class IndexingService
 
             $data->extras = $extras;
             $posts[$data->slug] = $data;
-
-            foreach ($data->categories as $category) {
-                if (!isset($categories[$category])) {
-                    $categories[$category] = [];
-                }
-                $categories[$category][] = $data->slug;
-            }
-
-            foreach ($data->tags as $tag) {
-                if (!isset($tags[$tag])) {
-                    $tags[$tag] = [];
-                }
-                $tags[$tag][] = $data->slug;
-            }
         }
 
-        return [
-            'posts' => $posts,
-            'categories' => $categories,
-            'tags' => $tags,
-        ];
+        return $posts;
     }
 
     /**
@@ -167,7 +192,7 @@ class IndexingService
         }
 
         return (object) [
-            'originalPath' => $path,
+            'path' => $path,
             'slug' => sha1($trimmedPath),
             'title' => $title,
             'categories' => [ $category ],
@@ -201,25 +226,6 @@ class IndexingService
     }
 
     /**
-     * Load the index of all markdown files.
-     *
-     * @return array
-     */
-    public function loadIndex (): array
-    {
-        if (self::$indexing !== null) {
-            return self::$indexing;
-        }
-
-        $indexPath = __DIR__ . '/../../storage/indexing.php';
-        if (!file_exists($indexPath)) {
-            return self::$indexing = $this->getIndexing();
-        }
-
-        return self::$indexing = require $indexPath;
-    }
-
-    /**
      * Get a post.
      *
      * @param string $slug
@@ -227,58 +233,113 @@ class IndexingService
      */
     public function getPost (string $slug): ?object
     {
-        $index = $this->loadIndex();
-        if (!isset($index['posts'][$slug])) {
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare('SELECT * FROM posts WHERE slug = ?');
+        if (!$stmt->execute([ $slug ])) {
             return null;
         }
-
-        return $index['posts'][$slug];
+        return $stmt->fetchObject();
     }
 
     /**
      * Get all posts.
      *
+     * @param int $offset
+     * @param int $limit
+     * @param string|null $where
      * @return array
      */
-    public function getPosts (): array
+    public function getPosts (int $offset, int $limit, string $where = null): array
     {
-        $index = $this->loadIndex();
-        return $index['posts'];
+        if ($where) {
+            $query = 'SELECT * FROM posts WHERE title LIKE ? ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+            $params = [ '%' . $where . '%', $limit, $offset ];
+        }
+        else {
+            $query = 'SELECT * FROM posts ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+            $params = [ $limit, $offset ];
+        }
+
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
+            return [];
+        }
+
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
     /**
      * Get all posts from a category.
      *
      * @param string $category
+     * @param int $offset
+     * @param int $limit
+     * @param string|null $where
      * @return array
      */
-    public function getCategoryPosts (string $category): array
+    public function getCategoryPosts (string $category, int $offset, int $limit, string $where = null): array
     {
-        $index = $this->loadIndex();
-        if (!isset($index['categories'][$category])) {
+        if ($where) {
+            $query = '
+                SELECT posts_categories.category AS category
+                INNER JOIN posts ON posts_categories.post = posts.slug
+                WHERE posts_categories.category = ? AND posts.title LIKE ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
+            ';
+            $params = [ $category, '%' . $where . '%', $limit, $offset ];
+        }
+        else {
+            $query = '
+                SELECT posts_categories.category AS category
+                INNER JOIN posts ON posts_categories.post = posts.slug
+                WHERE posts_categories.category = ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
+            ';
+            $params = [ $category, $limit, $offset ];
+        }
+
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
             return [];
         }
 
-        return array_map(function ($slug) use ($index) {
-            return $index['posts'][$slug];
-        }, $index['categories'][$category]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
     /**
      * Get all posts from a tag.
      *
      * @param string $tag
+     * @param int $offset
+     * @param int $limit
+     * @param string|null $where
      * @return array
      */
-    public function getTagPosts (string $tag): array
+    public function getTagPosts (string $tag, int $offset, int $limit, string $where = null): array
     {
-        $index = $this->loadIndex();
-        if (!isset($index['tags'][$tag])) {
+        if ($where) {
+            $query = '
+                SELECT posts_tags.tag AS tag
+                INNER JOIN posts ON posts_tags.post = posts.slug
+                WHERE posts_tags.tag = ? AND posts.title LIKE ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
+            ';
+            $params = [ $tag, '%' . $where . '%', $limit, $offset ];
+        }
+        else {
+            $query = '
+                SELECT posts_tags.tag AS tag
+                INNER JOIN posts ON posts_tags.post = posts.slug
+                WHERE posts_tags.tag = ? ORDER BY posts.createdAt DESC LIMIT ? OFFSET ?
+            ';
+            $params = [ $tag, $limit, $offset ];
+        }
+
+        $sqlite = $this->getSqlite();
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
             return [];
         }
 
-        return array_map(function ($slug) use ($index) {
-            return $index['posts'][$slug];
-        }, $index['tags'][$tag]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 }

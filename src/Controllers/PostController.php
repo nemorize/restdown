@@ -25,14 +25,7 @@ class PostController
         $limit = $request->getQueryParam('limit', 10);
         $query = $request->getQueryParam('query', null);
 
-        $posts = $this->postService->getPosts();
-        if ($query !== null) {
-            $posts = array_filter($posts, function ($post) use ($query) {
-                return stripos($post->title, $query) !== false;
-            });
-        }
-
-        $posts = array_slice($posts, $offset, $limit);
+        $posts = $this->postService->getPosts($offset, $limit, $query);
         return $response->withJson($posts);
     }
 

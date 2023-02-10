@@ -12,14 +12,17 @@ class PostService
     /**
      * Get multiple posts.
      *
+     * @param int $offset
+     * @param int $limit
+     * @param string|null $where
      * @return array
      */
-    public function getPosts (): array
+    public function getPosts (int $offset = 0, int $limit = 10, string $where = null): array
     {
-        $posts = $this->indexingService->getPosts();
+        $posts = $this->indexingService->getPosts($offset, $limit, $where);
         return array_map(function ($post) {
-            $post->content = $this->parseMarkdown($post->originalPath);
-            unset($post->originalPath);
+            $post->content = $this->parseMarkdown($post->path);
+            unset($post->path);
             return $post;
         }, $posts);
     }
@@ -37,8 +40,8 @@ class PostService
             return null;
         }
 
-        $post->content = $this->parseMarkdown($post->originalPath);
-        unset($post->originalPath);
+        $post->content = $this->parseMarkdown($post->path);
+        unset($post->path);
         return $post;
     }
 
