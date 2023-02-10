@@ -235,10 +235,11 @@ class IndexingService
     {
         $sqlite = $this->getSqlite();
         $stmt = $sqlite->prepare('SELECT * FROM posts WHERE slug = ?');
-        if (!$stmt->execute([ $slug ])) {
+        if (!$stmt->execute([ $slug ]) || !($post = $stmt->fetchObject())) {
             return null;
         }
-        return $stmt->fetchObject();
+
+        return $post;
     }
 
     /**
