@@ -80,6 +80,8 @@ class WebhookController
         }
 
         $this->indexingService->saveIndexing();
+        shell_exec('rm -rf ' . __DIR__ . '/../../storage/cache');
+
         return $response->withStatus(200);
     }
 }

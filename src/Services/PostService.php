@@ -65,7 +65,7 @@ class PostService
         }
 
         $cachePath = $cacheDir . '/' . sha1($path) . '.html';
-        if (file_exists($cachePath) && filemtime($cachePath) >= filemtime($path)) {
+        if (file_exists($cachePath)) {
             return file_get_contents($cachePath);
         }
 
