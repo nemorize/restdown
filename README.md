@@ -40,6 +40,10 @@ MARKDOWN_ROOT="./markdowns"
 ```
 
 ### 4. Set up your web server to serve the `public` directory.
+If you want to use Docker, you can use docker-compose to set up a web server.
+```bash
+docker-compose up -d
+```
 
 ### 5. Set up your GitHub webhook.
 - Payload URL: https://your.domain.com/webhook
