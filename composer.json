@@ -1,5 +1,5 @@
 {
-    "name": "nemo9l/php-slim-skeleton",
+    "name": "nemorize/restdown",
     "type": "project",
     "license": "MIT",
     "autoload": {
