@@ -5,6 +5,7 @@ All contents are stored in a GitHub repository, and you can sync your contents w
 
 ## Requirements
 - PHP 8.1 or higher
+  - with `shell_exec()` enabled
 - SQLite3 and PDO SQLite extension
 - Composer
 - Git
@@ -108,5 +109,151 @@ GET /posts/{slug}
     "extras": {},
     "content": "Content of post as HTML format"
   }
+}
+```
+
+### Get categories
+```http request
+GET /categories
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "categories": [
+    {
+      "name": "category1",
+      "count": 1
+    },
+    {
+      "name": "category2",
+      "count": 1
+    }
+  ]
+}
+```
+
+### Get category
+```http request
+GET /categories/{name}
+
+# name: name of category
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "category": {
+    "name": "category1",
+    "count": 1
+  }
+}
+```
+
+### Get posts in category
+```http request
+GET /categories/{name}/posts?offset=0&limit=10&query=keyword
+
+# name: name of category
+# offset, limit, query: same as /posts
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "posts": [
+    {
+      "slug": "slug-of-post",
+      "title": "Title of post",
+      "categories": [
+        "category1",
+        "category2"
+      ],
+      "tags": [
+        "tag1",
+        "tag2"
+      ],
+      "createdAt": 1672531200,
+      "updatedAt": 1672531200,
+      "extras": {},
+      "content": "Content of post as HTML format"
+    }
+  ]
+}
+```
+
+### Get tags
+```http request
+GET /tags
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "tags": [
+    {
+      "name": "tag1",
+      "count": 1
+    },
+    {
+      "name": "tag2",
+      "count": 1
+    }
+  ]
+}
+```
+
+### Get tag
+```http request
+GET /tags/{name}
+
+# name: name of tag
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "tag": {
+    "name": "tag1",
+    "count": 1
+  }
+}
+```
+
+### Get posts in tag
+```http request
+GET /tags/{name}/posts?offset=0&limit=10&query=keyword
+
+# name: name of tag
+# offset, limit, query: same as /posts
+```
+
+#### Response
+```json
+{
+  "success": true,
+  "posts": [
+    {
+      "slug": "slug-of-post",
+      "title": "Title of post",
+      "categories": [
+        "category1",
+        "category2"
+      ],
+      "tags": [
+        "tag1",
+        "tag2"
+      ],
+      "createdAt": 1672531200,
+      "updatedAt": 1672531200,
+      "extras": {},
+      "content": "Content of post as HTML format"
+    }
+  ]
 }
 ```
