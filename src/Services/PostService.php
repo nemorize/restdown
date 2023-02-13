@@ -15,19 +15,21 @@ class PostService
      * @param int $offset
      * @param int $limit
      * @param string|null $where
-     * @return array
+     * @return object
      */
-    public function getPosts (int $offset = 0, int $limit = 10, string $where = null): array
+    public function getPosts (int $offset = 0, int $limit = 10, string $where = null): object
     {
-        $posts = $this->indexingService->getPosts($offset, $limit, $where);
-        return array_map(function ($post) {
+        $output = $this->indexingService->getPosts($offset, $limit, $where);
+        $output->posts = array_map(function ($post) {
             $post->content = $this->parseMarkdown($post->path);
             $post->categories = json_decode($post->categories);
             $post->tags = json_decode($post->tags);
 
             unset($post->path);
             return $post;
-        }, $posts);
+        }, $output->posts);
+
+        return $output;
     }
 
     /**

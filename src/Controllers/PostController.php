@@ -45,10 +45,11 @@ class PostController
             ]);
         }
 
-        $posts = $this->postService->getPosts($offset, $limit, $query);
+        $output = $this->postService->getPosts($offset, $limit, $query);
         return $response->withJson([
             'success' => true,
-            'posts' => $posts
+            'totalCount' => $output->totalCount,
+            'posts' => $output->posts,
         ]);
     }
 

@@ -296,9 +296,9 @@ class IndexingService
      * @param int $offset
      * @param int $limit
      * @param string|null $where
-     * @return array
+     * @return object
      */
-    public function getPosts (int $offset, int $limit, string $where = null): array
+    public function getPosts (int $offset, int $limit, string $where = null): object
     {
         if ($where) {
             $query = 'SELECT * FROM posts WHERE title LIKE ? ORDER BY createdAt DESC LIMIT ? OFFSET ?';
@@ -312,10 +312,36 @@ class IndexingService
         $sqlite = $this->getSqlite();
         $stmt = $sqlite->prepare($query);
         if (!$stmt->execute($params)) {
-            return [];
+            return (object) [
+                'totalCount' => 0,
+                'posts' => []
+            ];
         }
 
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
+        $posts = $stmt->fetchAll(PDO::FETCH_OBJ);
+
+        if ($where) {
+            $query = 'SELECT count(*) FROM posts WHERE title LIKE ?';
+            $params = [ '%' . $where . '%' ];
+        }
+        else {
+            $query = 'SELECT count(*) FROM posts';
+            $params = [ ];
+        }
+
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
+            return (object) [
+                'totalCount' => count($posts),
+                'posts' => $posts
+            ];
+        }
+
+        $count = $stmt->fetchColumn();
+        return (object) [
+            'totalCount' => $count,
+            'posts' => $posts
+        ];
     }
 
     /**
@@ -325,9 +351,9 @@ class IndexingService
      * @param int $offset
      * @param int $limit
      * @param string|null $where
-     * @return array
+     * @return object
      */
-    public function getCategoryPosts (string $category, int $offset, int $limit, string $where = null): array
+    public function getCategoryPosts (string $category, int $offset, int $limit, string $where = null): object
     {
         if ($where) {
             $query = '
@@ -349,10 +375,40 @@ class IndexingService
         $sqlite = $this->getSqlite();
         $stmt = $sqlite->prepare($query);
         if (!$stmt->execute($params)) {
-            return [];
+            return (object) [
+                'totalCount' => 0,
+                'posts' => []
+            ];
         }
 
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
+        $posts = $stmt->fetchAll(PDO::FETCH_OBJ);
+
+        if ($where) {
+            $query = '
+                SELECT count(*), posts_categories.category, posts.* FROM posts_categories
+                INNER JOIN posts ON posts_categories.post = posts.slug
+                WHERE posts_categories.category = ? AND posts.title LIKE ?
+            ';
+            $params = [ $category, '%' . $where . '%' ];
+        }
+        else {
+            $query = 'SELECT count FROM categories WHERE name = ?';
+            $params = [ $category ];
+        }
+
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
+            return (object) [
+                'totalCount' => count($posts),
+                'posts' => $posts
+            ];
+        }
+
+        $count = $stmt->fetchColumn();
+        return (object) [
+            'totalCount' => $count,
+            'posts' => $posts
+        ];
     }
 
     /**
@@ -362,9 +418,9 @@ class IndexingService
      * @param int $offset
      * @param int $limit
      * @param string|null $where
-     * @return array
+     * @return object
      */
-    public function getTagPosts (string $tag, int $offset, int $limit, string $where = null): array
+    public function getTagPosts (string $tag, int $offset, int $limit, string $where = null): object
     {
         if ($where) {
             $query = '
@@ -386,10 +442,40 @@ class IndexingService
         $sqlite = $this->getSqlite();
         $stmt = $sqlite->prepare($query);
         if (!$stmt->execute($params)) {
-            return [];
+            return (object) [
+                'totalCount' => 0,
+                'posts' => []
+            ];
         }
 
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
+        $posts = $stmt->fetchAll(PDO::FETCH_OBJ);
+
+        if ($where) {
+            $query = '
+                SELECT count(*), posts_tags.tag, posts.* FROM posts_tags
+                INNER JOIN posts ON posts_tags.post = posts.slug
+                WHERE posts_tags.tag = ? AND posts.title LIKE ?
+            ';
+            $params = [ $tag, '%' . $where . '%' ];
+        }
+        else {
+            $query = 'SELECT count FROM tags WHERE name = ?';
+            $params = [ $tag ];
+        }
+
+        $stmt = $sqlite->prepare($query);
+        if (!$stmt->execute($params)) {
+            return (object) [
+                'totalCount' => count($posts),
+                'posts' => $posts
+            ];
+        }
+
+        $count = $stmt->fetchColumn();
+        return (object) [
+            'totalCount' => $count,
+            'posts' => $posts
+        ];
     }
 
     /**

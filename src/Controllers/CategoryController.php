@@ -103,10 +103,11 @@ class CategoryController
             ]);
         }
 
-        $posts = $this->categoryService->getCategoryPosts($name, $offset, $limit, $query);
+        $output = $this->categoryService->getCategoryPosts($name, $offset, $limit, $query);
         return $response->withJson([
             'success' => true,
-            'posts' => $posts
+            'totalCount' => $output->totalCount,
+            'posts' => $output->posts,
         ]);
     }
 }

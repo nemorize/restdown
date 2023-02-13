@@ -103,10 +103,11 @@ class TagController
             ]);
         }
 
-        $posts = $this->tagService->getTagPosts($name, $offset, $limit, $query);
+        $output = $this->tagService->getTagPosts($name, $offset, $limit, $query);
         return $response->withJson([
             'success' => true,
-            'posts' => $posts
+            'totalCount' => $output->count,
+            'posts' => $output->posts
         ]);
     }
 }

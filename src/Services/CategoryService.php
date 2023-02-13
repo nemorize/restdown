@@ -37,18 +37,19 @@ class CategoryService
      * @param int $offset
      * @param int $limit
      * @param string|null $where
-     * @return array
+     * @return object
      */
-    public function getCategoryPosts (string $category, int $offset, int $limit, string $where = null): array
+    public function getCategoryPosts (string $category, int $offset, int $limit, string $where = null): object
     {
-        $posts = $this->indexingService->getCategoryPosts($category, $offset, $limit, $where);
-        return array_map(function ($post) {
+        $output = $this->indexingService->getCategoryPosts($category, $offset, $limit, $where);
+        $output->posts = array_map(function ($post) {
             $post->content = $this->postService->parseMarkdown($post->path);
             $post->categories = json_decode($post->categories);
             $post->tags = json_decode($post->tags);
 
             unset($post->path);
             return $post;
-        }, $posts);
+        }, $output->posts);
+        return $output;
     }
 }
