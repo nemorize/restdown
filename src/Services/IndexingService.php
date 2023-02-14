@@ -264,10 +264,12 @@ class IndexingService
         }
 
         $stack = [];
-        return array_map(function ($segment) use (&$stack) {
+        $stacked = array_map(function ($segment) use (&$stack) {
             $stack[] = $segment;
             return implode('/', $stack);
         }, $segments);
+
+        return array_merge($segments, $stacked);
     }
 
     /**
