@@ -86,7 +86,7 @@ class IndexingService
         $categories = $tags = [];
 
         foreach ($index as $post) {
-            $postStmt->execute([ $post->slug, $post->path, $post->title, json_encode($post->categories), json_encode($tags), $post->createdAt, $post->updatedAt, json_encode($post->extras) ]);
+            $postStmt->execute([ $post->slug, $post->path, $post->title, json_encode($post->categories), json_encode($post->tags), $post->createdAt, $post->updatedAt, json_encode($post->extras) ]);
             foreach ($post->categories as $category) {
                 $postCategoryStmt->execute([ $post->slug, $category ]);
 
@@ -151,7 +151,7 @@ class IndexingService
                         $value = [ $value ];
                     }
 
-                    $data->tags = $value;
+                    $data->tags = array_unique($value);
                     continue;
                 }
 
