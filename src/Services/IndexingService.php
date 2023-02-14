@@ -229,6 +229,7 @@ class IndexingService
         $segments = explode('/', $trimmedPath);
         $title = substr(array_pop($segments), 0, -3);
         $category = implode('/', $segments);
+        $categories = $this->parseCategory($category);
 
         $createdAt = null;
         if (str_contains($title, '-')) {
@@ -243,10 +244,30 @@ class IndexingService
             'path' => $path,
             'slug' => sha1($trimmedPath),
             'title' => $title,
-            'categories' => [ $category ],
+            'categories' => $categories,
             'tags' => [],
             'createdAt' => $createdAt
         ];
+    }
+
+    /**
+     * Parse a category string.
+     *
+     * @param string $category
+     * @return array
+     */
+    private function parseCategory (string $category): array
+    {
+        $segments = explode('/', $category);
+        if (count($segments) === 1) {
+            return [ $category ];
+        }
+
+        $stack = [];
+        return array_map(function ($segment) use (&$stack) {
+            $stack[] = $segment;
+            return implode('/', $stack);
+        }, $segments);
     }
 
     /**
